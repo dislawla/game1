@@ -119,55 +119,20 @@ struct CardFrameView<Overlay: View>: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let w = geo.size.width
-            let h = geo.size.height
-            let shape = RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)
-
-            ZStack {
-                // Стекло: настоящий системный блюр вместо CSS backdrop-filter.
-                shape
-                    .fill(.ultraThinMaterial)
-                shape
-                    .fill(
-                        LinearGradient(
-                            colors: [theme.primary.opacity(0.22), Color(red: 0.043, green: 0.071, blue: 0.126), theme.secondary.opacity(0.22)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .opacity(0.85)
-
-                holoLayer(w: w, h: h)
-                    .clipShape(shape)
-
-                Group {
-                    DiagonalStripes(angleDegrees: 118, spacing: 46).stroke(Color.white.opacity(0.07), lineWidth: 1)
-                    DiagonalStripes(angleDegrees: 24, spacing: 64).stroke(Color.white.opacity(0.05), lineWidth: 1)
+        // "Color.clear + aspectRatio" как якорь пропорций, GeometryReader — только
+        // как .overlay поверх него. Раньше aspectRatio стоял НА самом GeometryReader,
+        // и в LazyVGrid с адаптивными колонками "осиротевшая" карточка в последнем
+        // неполном ряду (например, третья при 2 колонках) получала не то предложение
+        // высоты и растягивалась — не 3:4, а произвольно. Через .overlay geometry
+        // reader сам не участвует в определении итогового размера, только читает его.
+        Color.clear
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .overlay(
+                GeometryReader { geo in
+                    cardContent(w: geo.size.width, h: geo.size.height)
                 }
-                .clipShape(shape)
-                .blendMode(.overlay)
-
-                RadialGradient(colors: [.clear, .white.opacity(0.05), .white.opacity(0.16)], center: UnitPoint(x: 0.5, y: 0.42), startRadius: 0, endRadius: max(w, h) * 0.75)
-                    .blendMode(.screen)
-                    .clipShape(shape)
-
-                shape
-                    .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
-                RoundedRectangle(cornerRadius: max(0, size.cornerRadius - 4), style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
-                    .padding(w * 0.07)
-
-                gem(w: w, h: h)
-
-                artRegion(w: w, h: h)
-
-                nameChip(w: w, h: h)
-                powerChip(w: w, h: h)
-            }
-        }
-        .aspectRatio(3.0 / 4.0, contentMode: .fit)
-        .task(id: "\(imageName)|\(hasFrame)") {
+            )
+            .task(id: "\(imageName)|\(hasFrame)") {
             do {
                 art = try await CardArtCache.shared.art(imageName: imageName, hasFrame: hasFrame)
             } catch {
@@ -179,6 +144,59 @@ struct CardFrameView<Overlay: View>: View {
                 idleDrift = true
             }
         }
+    }
+
+    @ViewBuilder
+    private func cardContent(w: CGFloat, h: CGFloat) -> some View {
+        let shape = RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)
+
+        ZStack {
+            // Стекло: настоящий системный блюр вместо CSS backdrop-filter. .regularMaterial
+            // (не .ultraThinMaterial) — иначе на тёмном фоне карточка сливается в почти
+            // невидимое пятно, границу видно не будет вообще.
+            shape
+                .fill(.regularMaterial)
+            shape
+                .fill(
+                    LinearGradient(
+                        colors: [theme.primary.opacity(0.32), Color(red: 0.043, green: 0.071, blue: 0.126), theme.secondary.opacity(0.32)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .opacity(0.7)
+
+            holoLayer(w: w, h: h)
+                .clipShape(shape)
+
+            Group {
+                DiagonalStripes(angleDegrees: 118, spacing: 46).stroke(Color.white.opacity(0.07), lineWidth: 1)
+                DiagonalStripes(angleDegrees: 24, spacing: 64).stroke(Color.white.opacity(0.05), lineWidth: 1)
+            }
+            .clipShape(shape)
+            .blendMode(.overlay)
+
+            RadialGradient(colors: [.clear, .white.opacity(0.05), .white.opacity(0.16)], center: UnitPoint(x: 0.5, y: 0.42), startRadius: 0, endRadius: max(w, h) * 0.75)
+                .blendMode(.screen)
+                .clipShape(shape)
+
+            shape
+                .strokeBorder(Color.white.opacity(0.55), lineWidth: 1.5)
+            RoundedRectangle(cornerRadius: max(0, size.cornerRadius - 4), style: .continuous)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                .padding(w * 0.07)
+
+            gem(w: w, h: h)
+
+            artRegion(w: w, h: h)
+
+            nameChip(w: w, h: h)
+            powerChip(w: w, h: h)
+        }
+        // Внешняя тень, чтобы карточка визуально "отрывалась" от тёмного фона
+        // сетки, а не сливалась с ним — раньше её не было вовсе.
+        .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 6)
+        .shadow(color: theme.primary.opacity(0.35), radius: 14)
     }
 
     @ViewBuilder
