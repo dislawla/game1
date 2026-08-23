@@ -82,3 +82,9 @@ struct Card3DDetailView: View {
             .animation(isDragging ? nil : .easeOut(duration: 0.3), value: iceIntensity)
     }
 }
+
+// Живой предпросмотр в Xcode Canvas — само вращение мышью/пальцем в канвасе не
+// потрогать (там нет жестов), но видно, как выглядит карточка в состоянии покоя.
+#Preview {
+    Card3DDetailView(beast: BeastData.all.first(where: { $0.id == "JadeDragon" }) ?? BeastData.all[0]) {}
+}

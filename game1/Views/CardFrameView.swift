@@ -335,3 +335,19 @@ extension CardFrameView where Overlay == EmptyView {
         self.overlay = { _ in EmptyView() }
     }
 }
+
+// Живой предпросмотр в Xcode Canvas — сразу маленький (как в сетке) и крупный
+// (как в детальном виде) вариант одной и той же карточки рядом.
+#Preview("small") {
+    CardFrameView(name: "JadeDragon", power: 5, imageName: "jadeDragonR", hasFrame: false, size: .small)
+        .frame(width: 170, height: 170 * 4 / 3)
+        .padding()
+        .preferredColorScheme(.dark)
+}
+
+#Preview("large") {
+    CardFrameView(name: "JadeDragon", power: 5, imageName: "jadeDragonR", hasFrame: false, size: .large)
+        .frame(width: 320, height: 320 * 4 / 3)
+        .padding()
+        .preferredColorScheme(.dark)
+}
