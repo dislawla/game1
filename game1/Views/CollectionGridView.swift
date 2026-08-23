@@ -8,34 +8,48 @@ import SwiftUI
 struct CollectionGridView: View {
     @State private var selectedBeast: Beast?
 
-    // Две равные "колонки таблицы" вместо .adaptive — количество колонок и их
-    // ширина фиксированы всегда, карточки в каждой ячейке гарантированно
-    // одного размера (а не подстраиваются под то, сколько влезло по ширине).
-    private let columns = [
-        GridItem(.flexible(), spacing: 16),
-        GridItem(.flexible(), spacing: 16),
-    ]
+    private let columnCount = 2
+    private let spacing: CGFloat = 16
+    private let outerPadding: CGFloat = 16
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(BeastData.all) { beast in
-                        Button {
-                            selectedBeast = beast
-                        } label: {
-                            CardFrameView(
-                                name: beast.name,
-                                power: beast.power,
-                                imageName: beast.imageName,
-                                hasFrame: beast.hasFrame,
-                                size: .small
-                            )
+            // Размер карточки считаем явно, одним числом, от реальной доступной
+            // ширины экрана — вместо того чтобы полагаться на то, как LazyVGrid
+            // и внутренний GeometryReader/aspectRatio карточки договорятся между
+            // собой (на практике это оказалось ненадёжно: карточка в неполном
+            // ряду могла раздуться и наехать на соседние). Explicit .frame(width:
+            // height:) на каждой карточке ниже гарантирует одинаковый размер
+            // всегда, вне зависимости от того, сколько карточек и в каком ряду.
+            GeometryReader { geo in
+                let totalSpacing = spacing * CGFloat(columnCount - 1) + outerPadding * 2
+                let cardWidth = (geo.size.width - totalSpacing) / CGFloat(columnCount)
+                let cardHeight = cardWidth * 4 / 3
+                let columns = Array(
+                    repeating: GridItem(.fixed(cardWidth), spacing: spacing),
+                    count: columnCount
+                )
+
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: spacing) {
+                        ForEach(BeastData.all) { beast in
+                            Button {
+                                selectedBeast = beast
+                            } label: {
+                                CardFrameView(
+                                    name: beast.name,
+                                    power: beast.power,
+                                    imageName: beast.imageName,
+                                    hasFrame: beast.hasFrame,
+                                    size: .small
+                                )
+                                .frame(width: cardWidth, height: cardHeight)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
+                    .padding(outerPadding)
                 }
-                .padding(16)
             }
             .background(Color(red: 0.043, green: 0.075, blue: 0.098).ignoresSafeArea())
             .navigationTitle("Коллекция")
