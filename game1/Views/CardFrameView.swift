@@ -289,7 +289,7 @@ struct CardFrameView<Overlay: View>: View {
     }
 
     @ViewBuilder
-    private func chipBackground<S: Shape>(shape: S) -> some View {
+    private func chipBackground<S: InsettableShape>(shape: S) -> some View {
         shape
             .fill(LinearGradient(colors: [Color.black.opacity(0.55), Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
             .overlay(shape.strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
