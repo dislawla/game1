@@ -20,7 +20,6 @@ enum CardSize {
     var nameFontSize: CGFloat { isLarge ? 20 : 10 }
     var namePaddingH: CGFloat { isLarge ? 20 : 8 }
     var namePaddingV: CGFloat { isLarge ? 6 : 1 }
-    var nameBottomFraction: CGFloat { isLarge ? 0.15 : 0.14 }
     var powerSize: CGFloat { isLarge ? 56 : 26 }
     var powerFontSize: CGFloat { isLarge ? 22 : 11 }
 }
@@ -186,13 +185,30 @@ struct CardFrameView<Overlay: View>: View {
                 .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
                 .padding(w * 0.07)
 
-            gem(w: w, h: h)
-
             artRegion(w: w, h: h)
 
-            nameChip(w: w, h: h)
-            powerChip(w: w, h: h)
+            // Гем — верхний левый угол. VStack+HStack с двумя Spacer вместо
+            // .position(): содержимое прижимается к углу, но никогда не может
+            // "вылезти" за пределы (w×h), т.к. это обычная относительная раскладка.
+            VStack {
+                HStack {
+                    gem()
+                        .padding(size.gemOffset)
+                    Spacer(minLength: 0)
+                }
+                Spacer(minLength: 0)
+            }
+
+            // Имя + сила — прижаты к низу карточки тем же способом.
+            VStack(spacing: size.isLarge ? 8 : 4) {
+                Spacer(minLength: 0)
+                nameChip()
+                    .frame(maxWidth: w * 0.84)
+                powerChip()
+            }
+            .padding(.bottom, h * 0.03)
         }
+        .frame(width: w, height: h)
         // Внешняя тень, чтобы карточка визуально "отрывалась" от тёмного фона
         // сетки, а не сливалась с ним — раньше её не было вовсе.
         .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 6)
@@ -231,8 +247,10 @@ struct CardFrameView<Overlay: View>: View {
             .animation(tilt != nil ? nil : .easeInOut(duration: 8).repeatForever(autoreverses: true), value: idleDrift)
     }
 
+    /// Только содержимое гема, без позиционирования — куда его поставить решает
+    /// cardContent() через alignment/Spacer (относительная раскладка).
     @ViewBuilder
-    private func gem(w: CGFloat, h: CGFloat) -> some View {
+    private func gem() -> some View {
         let gemSize = size.gemSize
         ZStack {
             GemShape()
@@ -247,17 +265,16 @@ struct CardFrameView<Overlay: View>: View {
         }
         .frame(width: gemSize, height: gemSize)
         .shadow(color: theme.primary.opacity(0.8), radius: 6)
-        .position(x: size.gemOffset + gemSize / 2, y: size.gemOffset + gemSize / 2)
     }
 
+    /// Область персонажа — раньше вырезалась .position() с вычисленными вручную
+    /// центром/размером (абсолютные координаты, легко промахнуться и вылезти за
+    /// карточку). Теперь просто relative-паддинг внутри уже готового (w×h) слоя —
+    /// содержимое физически не может выйти за пределы родителя.
     @ViewBuilder
     private func artRegion(w: CGFloat, h: CGFloat) -> some View {
         let insetTB = size.artInsetTopBottom
         let insetSide = size.artInsetSides
-        let frameWidth = w * (1 - insetSide * 2)
-        let frameHeight = h * (1 - insetTB.top - insetTB.bottom)
-        let centerX = w * (insetSide + (1 - insetSide * 2) / 2)
-        let centerY = h * (insetTB.top + (1 - insetTB.top - insetTB.bottom) / 2)
 
         ZStack {
             if let art {
@@ -272,17 +289,13 @@ struct CardFrameView<Overlay: View>: View {
                 overlay(art)
             }
         }
-        .frame(width: frameWidth, height: frameHeight)
-        .position(x: centerX, y: centerY)
+        .padding(.top, h * insetTB.top)
+        .padding(.bottom, h * insetTB.bottom)
+        .padding(.horizontal, w * insetSide)
     }
 
-    /// bottom: X% в CSS — расстояние от НИЖНЕГО края карточки до нижнего края чипа.
-    /// Высота текста-чипа не фиксирована заранее, поэтому берём приблизительную
-    /// высоту по шрифту + вертикальный паддинг (близко к реальной, этого достаточно
-    /// для позиционирования — точную подгонку проще один раз сделать на устройстве).
     @ViewBuilder
-    private func nameChip(w: CGFloat, h: CGFloat) -> some View {
-        let chipHeight = size.nameFontSize + size.namePaddingV * 2 + 6
+    private func nameChip() -> some View {
         Text(name.uppercased())
             .font(.system(size: size.nameFontSize, weight: .semibold))
             .foregroundStyle(Color(red: 0.918, green: 0.965, blue: 1))
@@ -291,19 +304,16 @@ struct CardFrameView<Overlay: View>: View {
             .padding(.vertical, size.namePaddingV)
             .background(chipBackground(shape: Capsule()))
             .shadow(color: theme.primary.opacity(0.8), radius: 6)
-            .frame(maxWidth: w * 0.84)
-            .position(x: w / 2, y: h * (1 - size.nameBottomFraction) - chipHeight / 2)
     }
 
     @ViewBuilder
-    private func powerChip(w: CGFloat, h: CGFloat) -> some View {
+    private func powerChip() -> some View {
         Text("\(power)")
             .font(.system(size: size.powerFontSize, weight: .bold))
             .foregroundStyle(Color(red: 0.918, green: 0.965, blue: 1))
             .frame(width: size.powerSize, height: size.powerSize)
             .background(chipBackground(shape: Circle()))
             .shadow(color: theme.primary.opacity(0.6), radius: size.isLarge ? 10 : 5)
-            .position(x: w / 2, y: h * 0.97 - size.powerSize / 2)
     }
 
     @ViewBuilder

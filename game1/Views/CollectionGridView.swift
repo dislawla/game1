@@ -8,7 +8,13 @@ import SwiftUI
 struct CollectionGridView: View {
     @State private var selectedBeast: Beast?
 
-    private let columns = [GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 16)]
+    // Две равные "колонки таблицы" вместо .adaptive — количество колонок и их
+    // ширина фиксированы всегда, карточки в каждой ячейке гарантированно
+    // одного размера (а не подстраиваются под то, сколько влезло по ширине).
+    private let columns = [
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16),
+    ]
 
     var body: some View {
         NavigationStack {
