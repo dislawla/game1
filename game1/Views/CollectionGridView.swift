@@ -45,3 +45,10 @@ struct CollectionGridView: View {
         }
     }
 }
+
+// Живой предпросмотр в Xcode Canvas (Editor → Canvas, ⌥⌘Return) — правишь код
+// слева, картинка справа обновляется сама, без запуска симулятора.
+#Preview {
+    CollectionGridView()
+        .preferredColorScheme(.dark)
+}
