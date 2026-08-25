@@ -12,16 +12,27 @@ enum CardSize {
     case large
 
     var isLarge: Bool { self == .large }
-    var cornerRadius: CGFloat { isLarge ? 16 : 10 }
+
+    // Все размеры ниже — доли ширины карточки (w), а не абсолютные точки.
+    // Раньше 10pt текста или 24pt гема были одинаковы что на iPhone SE, что на
+    // Pro Max — при разной ширине карточки в сетке (она считается от ширины
+    // экрана) это давало то непропорционально крупные, то мелкие декорации.
+    // Значения ниже подобраны так, чтобы (fraction * w) давало прежний вид
+    // при исходных референсных ширинах (170pt — small, 320pt — large), а на
+    // любой другой ширине масштабировалось вместе с карточкой.
+    var cornerRadiusFraction: CGFloat { isLarge ? 0.05 : 0.0588 }
+    var innerCornerInsetFraction: CGFloat { isLarge ? 0.0125 : 0.0235 }
     var artInsetTopBottom: (top: CGFloat, bottom: CGFloat) { isLarge ? (0.08, 0.26) : (0.06, 0.24) }
     var artInsetSides: CGFloat { isLarge ? 0.08 : 0.06 }
-    var gemSize: CGFloat { isLarge ? 46 : 24 }
-    var gemOffset: CGFloat { isLarge ? 14 : 8 }
-    var nameFontSize: CGFloat { isLarge ? 20 : 10 }
-    var namePaddingH: CGFloat { isLarge ? 20 : 8 }
-    var namePaddingV: CGFloat { isLarge ? 6 : 1 }
-    var powerSize: CGFloat { isLarge ? 56 : 26 }
-    var powerFontSize: CGFloat { isLarge ? 22 : 11 }
+    var gemSizeFraction: CGFloat { isLarge ? 0.14375 : 0.1412 }
+    var gemOffsetFraction: CGFloat { isLarge ? 0.04375 : 0.0471 }
+    var nameFontSizeFraction: CGFloat { isLarge ? 0.0625 : 0.0588 }
+    var namePaddingHFraction: CGFloat { isLarge ? 0.0625 : 0.0471 }
+    var namePaddingVFraction: CGFloat { isLarge ? 0.01875 : 0.0059 }
+    var nameStackSpacingFraction: CGFloat { isLarge ? 0.025 : 0.0235 }
+    var powerSizeFraction: CGFloat { isLarge ? 0.175 : 0.1529 }
+    var powerFontSizeFraction: CGFloat { isLarge ? 0.06875 : 0.0647 }
+    var powerChipShadowFraction: CGFloat { isLarge ? 0.03125 : 0.0294 }
 }
 
 /// Диагональные полосы (порт .cracks — repeating-linear-gradient тонких линий).
@@ -85,7 +96,10 @@ struct CardFrameView<Overlay: View>: View {
     /// Текущий угол наклона (rotateX/rotateY в градусах). Если задан — голограмма
     /// следует за поворотом вместо автономной анимации по таймеру (порт tilt-пропа).
     let tilt: (x: Double, y: Double)?
-    let overlay: (ExtractedCardArt) -> Overlay
+    /// Второй параметр — ширина карточки в поинтах, чтобы оверлей (например,
+    /// ледяное свечение в Card3DDetailView) мог масштабировать свои эффекты
+    /// относительно реального размера карточки, а не хардкодить pt.
+    let overlay: (ExtractedCardArt, CGFloat) -> Overlay
 
     /// Явный init (не memberwise) — чтобы @ViewBuilder/@escaping точно применились
     /// к замыканию overlay без сомнений в поведении синтезированного инициализатора.
@@ -96,7 +110,7 @@ struct CardFrameView<Overlay: View>: View {
         hasFrame: Bool = false,
         size: CardSize = .small,
         tilt: (x: Double, y: Double)? = nil,
-        @ViewBuilder overlay: @escaping (ExtractedCardArt) -> Overlay
+        @ViewBuilder overlay: @escaping (ExtractedCardArt, CGFloat) -> Overlay
     ) {
         self.name = name
         self.power = power
@@ -147,7 +161,8 @@ struct CardFrameView<Overlay: View>: View {
 
     @ViewBuilder
     private func cardContent(w: CGFloat, h: CGFloat) -> some View {
-        let shape = RoundedRectangle(cornerRadius: size.cornerRadius, style: .continuous)
+        let cornerRadius = w * size.cornerRadiusFraction
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
 
         ZStack {
             // Стекло: настоящий системный блюр вместо CSS backdrop-filter. .regularMaterial
@@ -169,8 +184,8 @@ struct CardFrameView<Overlay: View>: View {
                 .clipShape(shape)
 
             Group {
-                DiagonalStripes(angleDegrees: 118, spacing: 46).stroke(Color.white.opacity(0.07), lineWidth: 1)
-                DiagonalStripes(angleDegrees: 24, spacing: 64).stroke(Color.white.opacity(0.05), lineWidth: 1)
+                DiagonalStripes(angleDegrees: 118, spacing: w * 0.2706).stroke(Color.white.opacity(0.07), lineWidth: w * 0.0059)
+                DiagonalStripes(angleDegrees: 24, spacing: w * 0.3765).stroke(Color.white.opacity(0.05), lineWidth: w * 0.0059)
             }
             .clipShape(shape)
             .blendMode(.overlay)
@@ -180,9 +195,9 @@ struct CardFrameView<Overlay: View>: View {
                 .clipShape(shape)
 
             shape
-                .strokeBorder(Color.white.opacity(0.55), lineWidth: 1.5)
-            RoundedRectangle(cornerRadius: max(0, size.cornerRadius - 4), style: .continuous)
-                .strokeBorder(Color.white.opacity(0.2), lineWidth: 1)
+                .strokeBorder(Color.white.opacity(0.55), lineWidth: w * 0.0088)
+            RoundedRectangle(cornerRadius: max(0, cornerRadius - w * size.innerCornerInsetFraction), style: .continuous)
+                .strokeBorder(Color.white.opacity(0.2), lineWidth: w * 0.0059)
                 .padding(w * 0.07)
 
             artRegion(w: w, h: h)
@@ -192,27 +207,28 @@ struct CardFrameView<Overlay: View>: View {
             // "вылезти" за пределы (w×h), т.к. это обычная относительная раскладка.
             VStack {
                 HStack {
-                    gem()
-                        .padding(size.gemOffset)
+                    gem(w: w)
+                        .padding(w * size.gemOffsetFraction)
                     Spacer(minLength: 0)
                 }
                 Spacer(minLength: 0)
             }
 
             // Имя + сила — прижаты к низу карточки тем же способом.
-            VStack(spacing: size.isLarge ? 8 : 4) {
+            VStack(spacing: w * size.nameStackSpacingFraction) {
                 Spacer(minLength: 0)
-                nameChip()
+                nameChip(w: w)
                     .frame(maxWidth: w * 0.84)
-                powerChip()
+                powerChip(w: w)
             }
             .padding(.bottom, h * 0.03)
         }
         .frame(width: w, height: h)
         // Внешняя тень, чтобы карточка визуально "отрывалась" от тёмного фона
-        // сетки, а не сливалась с ним — раньше её не было вовсе.
-        .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 6)
-        .shadow(color: theme.primary.opacity(0.35), radius: 14)
+        // сетки, а не сливалась с ним. Радиус — доля w, иначе на крупной
+        // (детальной) карточке тень выглядела бы непропорционально тонкой.
+        .shadow(color: .black.opacity(0.5), radius: w * 0.0588, x: 0, y: h * 0.0265)
+        .shadow(color: theme.primary.opacity(0.35), radius: w * 0.0824)
     }
 
     @ViewBuilder
@@ -233,7 +249,8 @@ struct CardFrameView<Overlay: View>: View {
 
         let offset: CGSize = {
             if let tilt {
-                return CGSize(width: tilt.y * 5, height: tilt.x * 5)
+                let tiltShift = w * 0.0294
+                return CGSize(width: tilt.y * tiltShift, height: tilt.x * tiltShift)
             }
             return CGSize(width: idleDrift ? w * 0.15 : -w * 0.15, height: idleDrift ? h * 0.15 : -h * 0.15)
         }()
@@ -248,10 +265,11 @@ struct CardFrameView<Overlay: View>: View {
     }
 
     /// Только содержимое гема, без позиционирования — куда его поставить решает
-    /// cardContent() через alignment/Spacer (относительная раскладка).
+    /// cardContent() через alignment/Spacer (относительная раскладка). Сам гем
+    /// (и его блик/тень) — доля переданной ширины карточки w.
     @ViewBuilder
-    private func gem() -> some View {
-        let gemSize = size.gemSize
+    private func gem(w: CGFloat) -> some View {
+        let gemSize = w * size.gemSizeFraction
         ZStack {
             GemShape()
                 .fill(
@@ -259,12 +277,12 @@ struct CardFrameView<Overlay: View>: View {
                 )
             GemHighlightShape()
                 .fill(Color.white.opacity(0.75))
-                .blur(radius: 1)
+                .blur(radius: gemSize * 0.0417)
                 .frame(width: gemSize * 0.3, height: gemSize * 0.24)
                 .offset(x: -gemSize * 0.2, y: -gemSize * 0.32)
         }
         .frame(width: gemSize, height: gemSize)
-        .shadow(color: theme.primary.opacity(0.8), radius: 6)
+        .shadow(color: theme.primary.opacity(0.8), radius: gemSize * 0.25)
     }
 
     /// Область персонажа — раньше вырезалась .position() с вычисленными вручную
@@ -281,12 +299,12 @@ struct CardFrameView<Overlay: View>: View {
                 Image(uiImage: art.silhouette)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                RoundedRectangle(cornerRadius: 8)
+                RoundedRectangle(cornerRadius: w * 0.047)
                     .fill(
                         LinearGradient(colors: [.white.opacity(0.12), theme.primary.opacity(0.14), theme.secondary.opacity(0.18)], startPoint: .top, endPoint: .bottom)
                     )
                     .blendMode(.overlay)
-                overlay(art)
+                overlay(art, w)
             }
         }
         .padding(.top, h * insetTB.top)
@@ -295,32 +313,34 @@ struct CardFrameView<Overlay: View>: View {
     }
 
     @ViewBuilder
-    private func nameChip() -> some View {
+    private func nameChip(w: CGFloat) -> some View {
         Text(name.uppercased())
-            .font(.system(size: size.nameFontSize, weight: .semibold))
+            .font(.system(size: w * size.nameFontSizeFraction, weight: .semibold))
             .foregroundStyle(Color(red: 0.918, green: 0.965, blue: 1))
             .lineLimit(1)
-            .padding(.horizontal, size.namePaddingH)
-            .padding(.vertical, size.namePaddingV)
-            .background(chipBackground(shape: Capsule()))
-            .shadow(color: theme.primary.opacity(0.8), radius: 6)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, w * size.namePaddingHFraction)
+            .padding(.vertical, w * size.namePaddingVFraction)
+            .background(chipBackground(shape: Capsule(), borderWidth: w * 0.0059))
+            .shadow(color: theme.primary.opacity(0.8), radius: w * 0.0353)
     }
 
     @ViewBuilder
-    private func powerChip() -> some View {
+    private func powerChip(w: CGFloat) -> some View {
+        let powerSize = w * size.powerSizeFraction
         Text("\(power)")
-            .font(.system(size: size.powerFontSize, weight: .bold))
+            .font(.system(size: w * size.powerFontSizeFraction, weight: .bold))
             .foregroundStyle(Color(red: 0.918, green: 0.965, blue: 1))
-            .frame(width: size.powerSize, height: size.powerSize)
-            .background(chipBackground(shape: Circle()))
-            .shadow(color: theme.primary.opacity(0.6), radius: size.isLarge ? 10 : 5)
+            .frame(width: powerSize, height: powerSize)
+            .background(chipBackground(shape: Circle(), borderWidth: w * 0.0059))
+            .shadow(color: theme.primary.opacity(0.6), radius: w * size.powerChipShadowFraction)
     }
 
     @ViewBuilder
-    private func chipBackground<S: InsettableShape>(shape: S) -> some View {
+    private func chipBackground<S: InsettableShape>(shape: S, borderWidth: CGFloat) -> some View {
         shape
             .fill(LinearGradient(colors: [Color.black.opacity(0.55), Color.black.opacity(0.65)], startPoint: .top, endPoint: .bottom))
-            .overlay(shape.strokeBorder(Color.white.opacity(0.28), lineWidth: 1))
+            .overlay(shape.strokeBorder(Color.white.opacity(0.28), lineWidth: borderWidth))
     }
 }
 
@@ -332,7 +352,7 @@ extension CardFrameView where Overlay == EmptyView {
         self.hasFrame = hasFrame
         self.size = size
         self.tilt = tilt
-        self.overlay = { _ in EmptyView() }
+        self.overlay = { _, _ in EmptyView() }
     }
 }
 

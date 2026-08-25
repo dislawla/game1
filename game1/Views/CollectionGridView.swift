@@ -9,8 +9,6 @@ struct CollectionGridView: View {
     @State private var selectedBeast: Beast?
 
     private let columnCount = 2
-    private let spacing: CGFloat = 16
-    private let outerPadding: CGFloat = 16
 
     var body: some View {
         NavigationStack {
@@ -21,7 +19,13 @@ struct CollectionGridView: View {
             // ряду могла раздуться и наехать на соседние). Explicit .frame(width:
             // height:) на каждой карточке ниже гарантирует одинаковый размер
             // всегда, вне зависимости от того, сколько карточек и в каком ряду.
+            //
+            // spacing/outerPadding — доля ширины экрана, а не фиксированные 16pt:
+            // на узком iPhone SE и на широком Pro Max отступы должны выглядеть
+            // одинаково "по ощущению", а не быть одним и тем же числом точек.
             GeometryReader { geo in
+                let spacing = geo.size.width * 0.0427
+                let outerPadding = geo.size.width * 0.0427
                 let totalSpacing = spacing * CGFloat(columnCount - 1) + outerPadding * 2
                 let cardWidth = (geo.size.width - totalSpacing) / CGFloat(columnCount)
                 let cardHeight = cardWidth * 4 / 3

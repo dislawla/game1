@@ -20,28 +20,32 @@ struct Card3DDetailView: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.7)
-                .ignoresSafeArea()
-                .onTapGesture { if !isDragging { onClose() } }
+        // Ширина карточки — доля экрана (0.84), а не фиксированные точки, так
+        // что на любом iPhone вокруг неё остаётся одинаковый по ощущению отступ.
+        GeometryReader { geo in
+            ZStack {
+                Color.black.opacity(0.7)
+                    .ignoresSafeArea()
+                    .onTapGesture { if !isDragging { onClose() } }
 
-            CardFrameView(
-                name: beast.name,
-                power: beast.power,
-                imageName: beast.imageName,
-                hasFrame: beast.hasFrame,
-                size: .large,
-                tilt: rotation
-            ) { art in
-                iceOutline(art: art)
+                CardFrameView(
+                    name: beast.name,
+                    power: beast.power,
+                    imageName: beast.imageName,
+                    hasFrame: beast.hasFrame,
+                    size: .large,
+                    tilt: rotation
+                ) { art, cardWidth in
+                    iceOutline(art: art, cardWidth: cardWidth)
+                }
+                .frame(width: geo.size.width * 0.84)
+                .rotation3DEffect(.degrees(rotation.y), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
+                .rotation3DEffect(.degrees(rotation.x), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
+                .animation(isDragging ? nil : .easeOut(duration: 0.3), value: rotation.x)
+                .animation(isDragging ? nil : .easeOut(duration: 0.3), value: rotation.y)
+                .gesture(dragGesture)
             }
-            .frame(maxWidth: 420)
-            .padding(32)
-            .rotation3DEffect(.degrees(rotation.y), axis: (x: 0, y: 1, z: 0), perspective: 0.5)
-            .rotation3DEffect(.degrees(rotation.x), axis: (x: 1, y: 0, z: 0), perspective: 0.5)
-            .animation(isDragging ? nil : .easeOut(duration: 0.3), value: rotation.x)
-            .animation(isDragging ? nil : .easeOut(duration: 0.3), value: rotation.y)
-            .gesture(dragGesture)
+            .frame(width: geo.size.width, height: geo.size.height)
         }
     }
 
@@ -65,10 +69,13 @@ struct Card3DDetailView: View {
     }
 
     @ViewBuilder
-    private func iceOutline(art: ExtractedCardArt) -> some View {
+    private func iceOutline(art: ExtractedCardArt, cardWidth: CGFloat) -> some View {
         let opacity = 0.25 + iceIntensity * 0.65
-        let blurSharp = 1 + iceIntensity * 2
-        let blurSoft = 3 + iceIntensity * 7
+        // Радиусы свечения — доля ширины карточки, а не фиксированные pt,
+        // иначе на большом экране (где карточка шире) обводка выглядела бы
+        // непропорционально тонкой.
+        let blurSharp = cardWidth * (0.003125 + iceIntensity * 0.00625)
+        let blurSoft = cardWidth * (0.009375 + iceIntensity * 0.021875)
 
         // В SwiftUI .shadow() считается по уже применённой прозрачности исходного
         // вью — opacity(0) до shadow погасил бы и саму тень. В веб-версии оверлей
